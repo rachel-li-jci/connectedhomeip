@@ -94,6 +94,7 @@ efr32_executable("lighting_app") {
     "src/ButtonHandler.cpp",
     "src/LightingManager.cpp",
     "src/ZclCallbacks.cpp",
+    "src/WatchdogManager.cpp",
     "src/main.cpp",
   ]
 

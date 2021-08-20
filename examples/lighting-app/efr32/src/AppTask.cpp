@@ -31,6 +31,8 @@
 #include "lcd.h"
 #include "qrcodegen.h"
 
+#include "WatchdogManager.h"
+
 #include <assert.h>
 
 #include <setup_payload/QRCodeSetupPayloadGenerator.h>
@@ -115,6 +117,10 @@ int AppTask::Init()
 
     EFR32_LOG("Current Firmware Version: %s", CHIP_DEVICE_CONFIG_DEVICE_FIRMWARE_REVISION);
     err = LightMgr().Init();
+
+    WatchdogMgr().InitWDOG();
+    WatchdogMgr().KickWDOG();
+
     if (err != CHIP_NO_ERROR)
     {
         EFR32_LOG("LightMgr().Init() failed");
@@ -237,6 +243,8 @@ void AppTask::AppTaskMain(void * pvParameter)
             PublishService();
             mLastChangeTimeUS = nowUS;
         }
+
+        WatchdogMgr().KickWDOG();
     }
 }
 
