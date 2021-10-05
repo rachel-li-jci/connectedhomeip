@@ -122,7 +122,8 @@ template("android_library") {
 
     javac_flags += [
       "-classpath",
-      "${android_sdk_root}/platforms/android-${android_sdk_version}/android.jar",
+     # "${android_sdk_root}/platforms/android-${android_sdk_version}/android.jar",
+       "${android_sdk_root}/${android_sdk_version}/android.jar",
       "-Xlint:-options",
       "-source",
       "8",

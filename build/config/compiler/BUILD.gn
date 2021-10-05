@@ -25,7 +25,8 @@ if (current_os == "mac") {
 declare_args() {
   # Enable -Werror. This can be disabled if using a different compiler
   # with unfixed or unsupported wanings.
-  treat_warnings_as_errors = true
+#  treat_warnings_as_errors = true
+  treat_warnings_as_errors = false
 }
 
 if (current_cpu == "arm" || current_cpu == "arm64") {
@@ -159,8 +160,8 @@ config("optimize_default") {
 config("disabled_warnings") {
   cflags = [
     "-Wno-deprecated-declarations",
-    "-Wno-unknown-warning-option",
-    "-Wno-maybe-uninitialized",
+#    "-Wno-unknown-warning-option",
+#    "-Wno-maybe-uninitialized",
     "-Wno-missing-field-initializers",
     "-Wno-unused-parameter",
   ]
@@ -191,7 +192,7 @@ config("warnings_common") {
 
   if (current_os != "mac" && current_os != "ios" && current_os != "linux" &&
       current_os != "win") {
-    cflags += [ "-Wstack-usage=8192" ]
+#    cflags += [ "-Wstack-usage=8192" ]
   }
 }
 
@@ -208,9 +209,9 @@ config("strict_warnings") {
 
   if (is_clang) {
     cflags += [
-      "-Wimplicit-fallthrough",
-      "-Wheader-hygiene",
-      "-Wformat-type-confusion",
+#      "-Wimplicit-fallthrough",
+#      "-Wheader-hygiene",
+#      "-Wformat-type-confusion",
     ]
   }
 
@@ -231,7 +232,7 @@ config("disabled_warnings_third_party") {
   cflags = [
     "-Wno-unused",
     "-Wno-format",
-    "-Wno-maybe-uninitialized",
+#    "-Wno-maybe-uninitialized",
     "-Wno-address",
   ]
 }

@@ -14,10 +14,10 @@
 
 declare_args() {
   # Location of the Android SDK.
-  android_sdk_root = ""
+  android_sdk_root = "/media/rachelli/T7/Gen4_Lucy/prebuilts/sdk"
 
   # Location of the Android NDK.
-  android_ndk_root = ""
+  android_ndk_root = "/media/rachelli/T7/Gen4_Lucy/prebuilts/ndk/current"
 
   # Version of the Android SDK.
   android_sdk_version = 21

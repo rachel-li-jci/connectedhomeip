@@ -23,7 +23,9 @@ template("android_clang_toolchain") {
   if (_invoker_toolchain_args.current_cpu == "arm") {
     _tool_name_root = "armv7a-linux-androideabi${invoker.api_level}-"
   } else if (_invoker_toolchain_args.current_cpu == "arm64") {
+    # did not comment out the first line to avoid "invoker.api_level" not used error message
     _tool_name_root = "aarch64-linux-android${invoker.api_level}-"
+    _tool_name_root = ""
   } else if (_invoker_toolchain_args.current_cpu == "x64") {
     _tool_name_root = "x86_64-linux-android${invoker.api_level}-"
   } else if (_invoker_toolchain_args.current_cpu == "x86") {
@@ -43,23 +45,27 @@ template("android_clang_toolchain") {
 
   _ndk_prefix = ""
   if (android_ndk_root != "") {
-    _ndk_host_os = ""
-    if (host_os == "linux") {
-      _ndk_host_os = "linux"
-    } else if (host_os == "mac") {
-      _ndk_host_os = "darwin"
-    } else if (host_os == "win") {
-      _ndk_host_os = "windows"
-    }
+#    _ndk_host_os = ""
+#    if (host_os == "linux") {
+#      _ndk_host_os = "linux"
+#    } else if (host_os == "mac") {
+#      _ndk_host_os = "darwin"
+#    } else if (host_os == "win") {
+#      _ndk_host_os = "windows"
+#    }
 
-    _ndk_host_cpu = ""
-    if (host_cpu == "x64") {
-      _ndk_host_cpu = "-x86_64"
-    }
+#    _ndk_host_cpu = ""
+#    if (host_cpu == "x64") {
+#      _ndk_host_cpu = "-x86_64"
+#    }
 
-    _ndk_host = _ndk_host_os + _ndk_host_cpu
+#    _ndk_host = _ndk_host_os + _ndk_host_cpu
+    
     _ndk_prefix =
-        "${android_ndk_root}/toolchains/llvm/prebuilt/${_ndk_host}/bin/"
+        # "${android_ndk_root}/toolchains/llvm/prebuilt/${_ndk_host}/bin/"
+        #"/media/rachelli/T7/Gen4_Lucy/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/"
+        #"/media/rachelli/T7/Gen4_Lucy/prebuilts/clang/host/linux-x86/clang-4691093/bin/"
+        "/media/rachelli/T7/toolchain/aarch64-linux-android-ndk-r16b/bin/"
   }
 
   gcc_toolchain(target_name) {
@@ -67,5 +73,9 @@ template("android_clang_toolchain") {
     ar = _ndk_prefix + "llvm-ar"
     cc = _ndk_prefix + _tool_name_root + "clang"
     cxx = _ndk_prefix + _tool_name_root + "clang++"
+    
+    #ar = _ndk_prefix + "ar"
+    #cc = _ndk_prefix + _tool_name_root + "gcc"
+    #cxx = _ndk_prefix + _tool_name_root + "g++"
   }
 }
