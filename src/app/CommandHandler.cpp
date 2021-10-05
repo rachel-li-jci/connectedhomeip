@@ -34,8 +34,8 @@ using GeneralStatusCode = chip::Protocols::SecureChannel::GeneralStatusCode;
 
 namespace chip {
 namespace app {
-CHIP_ERROR CommandHandler::OnInvokeCommandRequest(Messaging::ExchangeContext * ec, const PacketHeader & packetHeader,
-                                                  const PayloadHeader & payloadHeader, System::PacketBufferHandle && payload)
+CHIP_ERROR CommandHandler::OnInvokeCommandRequest(Messaging::ExchangeContext * ec, const PayloadHeader & payloadHeader,
+                                                  System::PacketBufferHandle && payload)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     System::PacketBufferHandle response;
@@ -51,7 +51,6 @@ CHIP_ERROR CommandHandler::OnInvokeCommandRequest(Messaging::ExchangeContext * e
     err = SendCommandResponse();
 
 exit:
-    ChipLogFunctError(err);
     return err;
 }
 
@@ -73,7 +72,6 @@ CHIP_ERROR CommandHandler::SendCommandResponse()
 
 exit:
     ShutdownInternal();
-    ChipLogFunctError(err);
     return err;
 }
 
@@ -127,7 +125,7 @@ exit:
 
         AddStatusCode(returnStatusParam,
                       err == CHIP_ERROR_INVALID_PROFILE_ID ? GeneralStatusCode::kNotFound : GeneralStatusCode::kInvalidArgument,
-                      Protocols::InteractionModel::Id, Protocols::InteractionModel::ProtocolCode::InvalidCommand);
+                      Protocols::InteractionModel::Id, Protocols::InteractionModel::Status::InvalidCommand);
     }
     // We have handled the error status above and put the error status in response, now return success status so we can process
     // other commands in the invoke request.
@@ -136,28 +134,33 @@ exit:
 
 CHIP_ERROR CommandHandler::AddStatusCode(const CommandPathParams & aCommandPathParams,
                                          const Protocols::SecureChannel::GeneralStatusCode aGeneralCode,
-                                         const Protocols::Id aProtocolId,
-                                         const Protocols::InteractionModel::ProtocolCode aProtocolCode)
+                                         const Protocols::Id aProtocolId, const Protocols::InteractionModel::Status aStatus)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     StatusElement::Builder statusElementBuilder;
 
-    err = PrepareCommand(aCommandPathParams, true /* isStatus */);
+    err = PrepareCommand(aCommandPathParams, false /* aStartDataStruct */);
     SuccessOrExit(err);
 
     statusElementBuilder =
         mInvokeCommandBuilder.GetCommandListBuilder().GetCommandDataElementBuilder().CreateStatusElementBuilder();
-    statusElementBuilder
-        .EncodeStatusElement(aGeneralCode, aProtocolId.ToFullyQualifiedSpecForm(), chip::to_underlying(aProtocolCode))
+    statusElementBuilder.EncodeStatusElement(aGeneralCode, aProtocolId.ToFullyQualifiedSpecForm(), chip::to_underlying(aStatus))
         .EndOfStatusElement();
     err = statusElementBuilder.GetError();
     SuccessOrExit(err);
 
-    err = FinishCommand(true /* isStatus */);
+    err = FinishCommand(false /* aEndDataStruct */);
 
 exit:
-    ChipLogFunctError(err);
     return err;
+}
+
+CHIP_ERROR CommandHandler::PrepareResponse(const ConcreteCommandPath & aRequestCommandPath, CommandId aResponseCommand)
+{
+    CommandPathParams params = { aRequestCommandPath.mEndpointId,
+                                 0, // GroupId
+                                 aRequestCommandPath.mClusterId, aResponseCommand, (CommandPathFlags::kEndpointIdValid) };
+    return PrepareCommand(params, false /* aStartDataStruct */);
 }
 
 } // namespace app

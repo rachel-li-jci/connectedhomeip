@@ -46,7 +46,6 @@ CHIP_ERROR Command::Init(Messaging::ExchangeManager * apExchangeMgr, Interaction
     SuccessOrExit(err);
 
 exit:
-    ChipLogFunctError(err);
     return err;
 }
 
@@ -73,7 +72,6 @@ CHIP_ERROR Command::Reset()
     mCommandIndex = 0;
 
 exit:
-    ChipLogFunctError(err);
     return err;
 }
 
@@ -122,7 +120,6 @@ CHIP_ERROR Command::ProcessCommandMessage(System::PacketBufferHandle && payload,
     }
 
 exit:
-    ChipLogFunctError(err);
     return err;
 }
 
@@ -145,7 +142,7 @@ void Command::ShutdownInternal()
     mCommandIndex = 0;
 }
 
-CHIP_ERROR Command::PrepareCommand(const CommandPathParams & aCommandPathParams, bool aIsStatus)
+CHIP_ERROR Command::PrepareCommand(const CommandPathParams & aCommandPathParams, bool aStartDataStruct)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     CommandDataElement::Builder commandDataElement;
@@ -157,13 +154,12 @@ CHIP_ERROR Command::PrepareCommand(const CommandPathParams & aCommandPathParams,
     err = ConstructCommandPath(aCommandPathParams, commandDataElement);
     SuccessOrExit(err);
 
-    if (!aIsStatus)
+    if (aStartDataStruct)
     {
         err = commandDataElement.GetWriter()->StartContainer(TLV::ContextTag(CommandDataElement::kCsTag_Data),
                                                              TLV::kTLVType_Structure, mDataElementContainerType);
     }
 exit:
-    ChipLogFunctError(err);
     return err;
 }
 
@@ -172,12 +168,12 @@ TLV::TLVWriter * Command::GetCommandDataElementTLVWriter()
     return mInvokeCommandBuilder.GetCommandListBuilder().GetCommandDataElementBuilder().GetWriter();
 }
 
-CHIP_ERROR Command::FinishCommand(bool aIsStatus)
+CHIP_ERROR Command::FinishCommand(bool aEndDataStruct)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
     CommandDataElement::Builder commandDataElement = mInvokeCommandBuilder.GetCommandListBuilder().GetCommandDataElementBuilder();
-    if (!aIsStatus)
+    if (aEndDataStruct)
     {
         err = commandDataElement.GetWriter()->EndContainer(mDataElementContainerType);
         SuccessOrExit(err);
@@ -188,7 +184,6 @@ CHIP_ERROR Command::FinishCommand(bool aIsStatus)
     MoveToState(CommandState::AddCommand);
 
 exit:
-    ChipLogFunctError(err);
     return err;
 }
 
@@ -240,7 +235,6 @@ CHIP_ERROR Command::FinalizeCommandsMessage(System::PacketBufferHandle & command
     err = mCommandMessageWriter.Finalize(&commandPacket);
     SuccessOrExit(err);
 exit:
-    ChipLogFunctError(err);
     return err;
 }
 

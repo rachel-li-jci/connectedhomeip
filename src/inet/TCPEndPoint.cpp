@@ -223,7 +223,7 @@ CHIP_ERROR TCPEndPoint::Bind(IPAddressType addrType, const IPAddress & addr, uin
             sa.sin6_scope_id = 0;
 
             if (bind(mSocket, reinterpret_cast<const sockaddr *>(&sa), static_cast<unsigned>(sizeof(sa))) != 0)
-                res = chip::System::MapErrorPOSIX(errno);
+                res = CHIP_ERROR_POSIX(errno);
         }
 #if INET_CONFIG_ENABLE_IPV4
         else if (addrType == kIPAddressType_IPv4)
@@ -235,7 +235,7 @@ CHIP_ERROR TCPEndPoint::Bind(IPAddressType addrType, const IPAddress & addr, uin
             sa.sin_addr   = addr.ToIPv4();
 
             if (bind(mSocket, reinterpret_cast<const sockaddr *>(&sa), static_cast<unsigned>(sizeof(sa))) != 0)
-                res = chip::System::MapErrorPOSIX(errno);
+                res = CHIP_ERROR_POSIX(errno);
         }
 #endif // INET_CONFIG_ENABLE_IPV4
         else
@@ -243,7 +243,7 @@ CHIP_ERROR TCPEndPoint::Bind(IPAddressType addrType, const IPAddress & addr, uin
     }
 
 #if CHIP_SYSTEM_CONFIG_USE_DISPATCH
-    dispatch_queue_t dispatchQueue = Layer().SystemLayer()->GetDispatchQueue();
+    dispatch_queue_t dispatchQueue = static_cast<System::LayerSocketsLoop *>(Layer().SystemLayer())->GetDispatchQueue();
     if (dispatchQueue != nullptr)
     {
         unsigned long fd = static_cast<unsigned long>(mSocket);
@@ -299,7 +299,7 @@ CHIP_ERROR TCPEndPoint::Listen(uint16_t backlog)
 
     if (listen(mSocket, backlog) != 0)
     {
-        res = chip::System::MapErrorPOSIX(errno);
+        res = CHIP_ERROR_POSIX(errno);
     }
     else
     {
@@ -308,10 +308,11 @@ CHIP_ERROR TCPEndPoint::Listen(uint16_t backlog)
         fcntl(mSocket, F_SETFL, flags | O_NONBLOCK);
 
         // Wait for ability to read on this endpoint.
-        res = Layer().SystemLayer()->SetCallback(mWatch, HandlePendingIO, reinterpret_cast<intptr_t>(this));
+        res = static_cast<System::LayerSockets *>(Layer().SystemLayer())
+                  ->SetCallback(mWatch, HandlePendingIO, reinterpret_cast<intptr_t>(this));
         if (res == CHIP_NO_ERROR)
         {
-            res = Layer().SystemLayer()->RequestCallbackOnPendingRead(mWatch);
+            res = static_cast<System::LayerSockets *>(Layer().SystemLayer())->RequestCallbackOnPendingRead(mWatch);
         }
     }
 
@@ -449,7 +450,7 @@ CHIP_ERROR TCPEndPoint::Connect(const IPAddress & addr, uint16_t port, Interface
             int r = setsockopt(mSocket, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr));
             if (r < 0 && errno != EACCES)
             {
-                return res = chip::System::MapErrorPOSIX(errno);
+                return res = CHIP_ERROR_POSIX(errno);
             }
 
             if (r < 0)
@@ -515,12 +516,13 @@ CHIP_ERROR TCPEndPoint::Connect(const IPAddress & addr, uint16_t port, Interface
 
     if (conRes == -1 && errno != EINPROGRESS)
     {
-        res = chip::System::MapErrorPOSIX(errno);
+        res = CHIP_ERROR_POSIX(errno);
         DoClose(res, true);
         return res;
     }
 
-    ReturnErrorOnFailure(Layer().SystemLayer()->SetCallback(mWatch, HandlePendingIO, reinterpret_cast<intptr_t>(this)));
+    ReturnErrorOnFailure(static_cast<System::LayerSockets *>(Layer().SystemLayer())
+                             ->SetCallback(mWatch, HandlePendingIO, reinterpret_cast<intptr_t>(this)));
 
     // Once Connecting or Connected, bump the reference count.  The corresponding Release()
     // [or on LwIP, DeferredRelease()] will happen in DoClose().
@@ -530,7 +532,7 @@ CHIP_ERROR TCPEndPoint::Connect(const IPAddress & addr, uint16_t port, Interface
     {
         State = kState_Connected;
         // Wait for ability to read on this endpoint.
-        ReturnErrorOnFailure(Layer().SystemLayer()->RequestCallbackOnPendingRead(mWatch));
+        ReturnErrorOnFailure(static_cast<System::LayerSockets *>(Layer().SystemLayer())->RequestCallbackOnPendingRead(mWatch));
         if (OnConnectComplete != nullptr)
             OnConnectComplete(this, CHIP_NO_ERROR);
     }
@@ -538,7 +540,7 @@ CHIP_ERROR TCPEndPoint::Connect(const IPAddress & addr, uint16_t port, Interface
     {
         State = kState_Connecting;
         // Wait for ability to write on this endpoint.
-        ReturnErrorOnFailure(Layer().SystemLayer()->RequestCallbackOnPendingWrite(mWatch));
+        ReturnErrorOnFailure(static_cast<System::LayerSockets *>(Layer().SystemLayer())->RequestCallbackOnPendingWrite(mWatch));
     }
 
 #endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
@@ -631,7 +633,7 @@ CHIP_ERROR TCPEndPoint::GetPeerInfo(IPAddress * retAddr, uint16_t * retPort) con
     socklen_t saLen = sizeof(sa);
 
     if (getpeername(mSocket, &sa.any, &saLen) != 0)
-        return chip::System::MapErrorPOSIX(errno);
+        return CHIP_ERROR_POSIX(errno);
 
     if (sa.any.sa_family == AF_INET6)
     {
@@ -702,7 +704,7 @@ CHIP_ERROR TCPEndPoint::GetLocalInfo(IPAddress * retAddr, uint16_t * retPort)
     socklen_t saLen = sizeof(sa);
 
     if (getsockname(mSocket, &sa.any, &saLen) != 0)
-        return chip::System::MapErrorPOSIX(errno);
+        return CHIP_ERROR_POSIX(errno);
 
     if (sa.any.sa_family == AF_INET6)
     {
@@ -752,7 +754,7 @@ CHIP_ERROR TCPEndPoint::GetInterfaceId(InterfaceId * retInterface)
 
     if (getpeername(mSocket, &sa.any, &saLen) != 0)
     {
-        return chip::System::MapErrorPOSIX(errno);
+        return CHIP_ERROR_POSIX(errno);
     }
 
     if (sa.any.sa_family == AF_INET6)
@@ -799,7 +801,7 @@ CHIP_ERROR TCPEndPoint::Send(System::PacketBufferHandle && data, bool push)
         mSendQueue = std::move(data);
 #if CHIP_SYSTEM_CONFIG_USE_SOCKETS
         // Wait for ability to write on this endpoint.
-        ReturnErrorOnFailure(Layer().SystemLayer()->RequestCallbackOnPendingWrite(mWatch));
+        ReturnErrorOnFailure(static_cast<System::LayerSockets *>(Layer().SystemLayer())->RequestCallbackOnPendingWrite(mWatch));
 #endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
     }
     else
@@ -877,7 +879,7 @@ CHIP_ERROR TCPEndPoint::EnableNoDelay()
         // Disable TCP Nagle buffering by setting TCP_NODELAY socket option to true
         val = 1;
         if (setsockopt(mSocket, TCP_SOCKOPT_LEVEL, TCP_NODELAY, &val, sizeof(val)) != 0)
-            return chip::System::MapErrorPOSIX(errno);
+            return CHIP_ERROR_POSIX(errno);
 #endif // defined(TCP_NODELAY)
     }
 
@@ -935,22 +937,22 @@ CHIP_ERROR TCPEndPoint::EnableKeepAlive(uint16_t interval, uint16_t timeoutCount
         // Set the idle interval
         val = interval;
         if (setsockopt(mSocket, TCP_SOCKOPT_LEVEL, TCP_IDLE_INTERVAL_OPT_NAME, &val, sizeof(val)) != 0)
-            return chip::System::MapErrorPOSIX(errno);
+            return CHIP_ERROR_POSIX(errno);
 
         // Set the probe retransmission interval.
         val = interval;
         if (setsockopt(mSocket, TCP_SOCKOPT_LEVEL, TCP_KEEPINTVL, &val, sizeof(val)) != 0)
-            return chip::System::MapErrorPOSIX(errno);
+            return CHIP_ERROR_POSIX(errno);
 
         // Set the probe timeout count
         val = timeoutCount;
         if (setsockopt(mSocket, TCP_SOCKOPT_LEVEL, TCP_KEEPCNT, &val, sizeof(val)) != 0)
-            return chip::System::MapErrorPOSIX(errno);
+            return CHIP_ERROR_POSIX(errno);
 
         // Enable keepalives for the connection.
         val = 1; // enable
         if (setsockopt(mSocket, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) != 0)
-            return chip::System::MapErrorPOSIX(errno);
+            return CHIP_ERROR_POSIX(errno);
     }
 
 #endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
@@ -1011,7 +1013,7 @@ CHIP_ERROR TCPEndPoint::DisableKeepAlive()
         // Disable keepalives on the connection.
         val = 0; // disable
         if (setsockopt(mSocket, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) != 0)
-            return chip::System::MapErrorPOSIX(errno);
+            return CHIP_ERROR_POSIX(errno);
     }
 
 #endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
@@ -1061,7 +1063,7 @@ CHIP_ERROR TCPEndPoint::SetUserTimeout(uint32_t userTimeoutMillis)
     // Set the user timeout
     uint32_t val = userTimeoutMillis;
     if (setsockopt(mSocket, TCP_SOCKOPT_LEVEL, TCP_USER_TIMEOUT, &val, sizeof(val)) != 0)
-        return chip::System::MapErrorPOSIX(errno);
+        return CHIP_ERROR_POSIX(errno);
 #else  // TCP_USER_TIMEOUT
     res = CHIP_ERROR_NOT_IMPLEMENTED;
 #endif // defined(TCP_USER_TIMEOUT)
@@ -1377,7 +1379,7 @@ CHIP_ERROR TCPEndPoint::DriveSending()
 
     // Pretend send() fails in the while loop below
     INET_FAULT_INJECT(FaultInjection::kFault_Send, {
-        err = chip::System::MapErrorPOSIX(EIO);
+        err = CHIP_ERROR_POSIX(EIO);
         DoClose(err, false);
         return err;
     });
@@ -1391,7 +1393,7 @@ CHIP_ERROR TCPEndPoint::DriveSending()
         if (lenSentRaw == -1)
         {
             if (errno != EAGAIN && errno != EWOULDBLOCK)
-                err = (errno == EPIPE) ? INET_ERROR_PEER_DISCONNECTED : chip::System::MapErrorPOSIX(errno);
+                err = (errno == EPIPE) ? INET_ERROR_PEER_DISCONNECTED : CHIP_ERROR_POSIX(errno);
             break;
         }
 
@@ -1417,7 +1419,7 @@ CHIP_ERROR TCPEndPoint::DriveSending()
             if (mSendQueue.IsNull())
             {
                 // Do not wait for ability to write on this endpoint.
-                err = Layer().SystemLayer()->ClearCallbackOnPendingWrite(mWatch);
+                err = static_cast<System::LayerSockets *>(Layer().SystemLayer())->ClearCallbackOnPendingWrite(mWatch);
                 if (err != CHIP_NO_ERROR)
                 {
                     break;
@@ -1471,7 +1473,7 @@ CHIP_ERROR TCPEndPoint::DriveSending()
         if (State == kState_SendShutdown && mSendQueue.IsNull())
         {
             if (shutdown(mSocket, SHUT_WR) != 0)
-                err = chip::System::MapErrorPOSIX(errno);
+                err = CHIP_ERROR_POSIX(errno);
         }
     }
 
@@ -1524,10 +1526,10 @@ void TCPEndPoint::HandleConnectComplete(CHIP_ERROR err)
 
 #if CHIP_SYSTEM_CONFIG_USE_SOCKETS
         // Wait for ability to read or write on this endpoint.
-        err = Layer().SystemLayer()->RequestCallbackOnPendingRead(mWatch);
+        err = static_cast<System::LayerSockets *>(Layer().SystemLayer())->RequestCallbackOnPendingRead(mWatch);
         if (err == CHIP_NO_ERROR)
         {
-            err = Layer().SystemLayer()->RequestCallbackOnPendingWrite(mWatch);
+            err = static_cast<System::LayerSockets *>(Layer().SystemLayer())->RequestCallbackOnPendingWrite(mWatch);
         }
         if (err != CHIP_NO_ERROR)
         {
@@ -1666,7 +1668,7 @@ CHIP_ERROR TCPEndPoint::DoClose(CHIP_ERROR err, bool suppressCallback)
                     ChipLogError(Inet, "SO_LINGER: %d", errno);
             }
 
-            Layer().SystemLayer()->StopWatchingSocket(&mWatch);
+            static_cast<System::LayerSockets *>(Layer().SystemLayer())->StopWatchingSocket(&mWatch);
             close(mSocket);
             mSocket = INET_INVALID_SOCKET_FD;
         }
@@ -2181,8 +2183,8 @@ err_t TCPEndPoint::LwIPHandleConnectComplete(void * arg, struct tcp_pcb * tpcb, 
     if (arg != NULL)
     {
         CHIP_ERROR conErr;
-        TCPEndPoint * ep                   = static_cast<TCPEndPoint *>(arg);
-        chip::System::Layer * lSystemLayer = ep->Layer().SystemLayer();
+        TCPEndPoint * ep                 = static_cast<TCPEndPoint *>(arg);
+        System::LayerLwIP * lSystemLayer = static_cast<System::LayerLwIP *>(ep->Layer().SystemLayer());
 
         if (lwipErr == ERR_OK)
         {
@@ -2212,9 +2214,9 @@ err_t TCPEndPoint::LwIPHandleIncomingConnection(void * arg, struct tcp_pcb * tpc
 
     if (arg != NULL)
     {
-        TCPEndPoint * listenEP             = static_cast<TCPEndPoint *>(arg);
-        TCPEndPoint * conEP                = NULL;
-        chip::System::Layer * lSystemLayer = listenEP->Layer().SystemLayer();
+        TCPEndPoint * listenEP           = static_cast<TCPEndPoint *>(arg);
+        TCPEndPoint * conEP              = NULL;
+        System::LayerLwIP * lSystemLayer = static_cast<System::LayerLwIP *>(listenEP->Layer().SystemLayer());
 
         // Tell LwIP we've accepted the connection so it can decrement the listen PCB's pending_accepts counter.
         tcp_accepted(listenEP->mTCP);
@@ -2291,8 +2293,8 @@ err_t TCPEndPoint::LwIPHandleDataReceived(void * arg, struct tcp_pcb * tpcb, str
 
     if (arg != NULL)
     {
-        TCPEndPoint * ep                   = static_cast<TCPEndPoint *>(arg);
-        chip::System::Layer * lSystemLayer = ep->Layer().SystemLayer();
+        TCPEndPoint * ep                 = static_cast<TCPEndPoint *>(arg);
+        System::LayerLwIP * lSystemLayer = static_cast<System::LayerLwIP *>(ep->Layer().SystemLayer());
 
         // Post callback to HandleDataReceived.
         if (lSystemLayer->PostEvent(*ep, kInetEvent_TCPDataReceived, (uintptr_t) p) != CHIP_NO_ERROR)
@@ -2313,8 +2315,8 @@ err_t TCPEndPoint::LwIPHandleDataSent(void * arg, struct tcp_pcb * tpcb, u16_t l
 
     if (arg != NULL)
     {
-        TCPEndPoint * ep                   = static_cast<TCPEndPoint *>(arg);
-        chip::System::Layer * lSystemLayer = ep->Layer().SystemLayer();
+        TCPEndPoint * ep                 = static_cast<TCPEndPoint *>(arg);
+        System::LayerLwIP * lSystemLayer = static_cast<System::LayerLwIP *>(ep->Layer().SystemLayer());
 
         // Post callback to HandleDataReceived.
         if (lSystemLayer->PostEvent(*ep, kInetEvent_TCPDataSent, (uintptr_t) len) != CHIP_NO_ERROR)
@@ -2333,8 +2335,8 @@ void TCPEndPoint::LwIPHandleError(void * arg, err_t lwipErr)
 {
     if (arg != NULL)
     {
-        TCPEndPoint * ep                   = static_cast<TCPEndPoint *>(arg);
-        chip::System::Layer * lSystemLayer = ep->Layer().SystemLayer();
+        TCPEndPoint * ep                 = static_cast<TCPEndPoint *>(arg);
+        System::LayerLwIP * lSystemLayer = static_cast<System::LayerLwIP *>(ep->Layer().SystemLayer());
 
         // At this point LwIP has already freed the PCB.  Since the thread that owns the TCPEndPoint may
         // try to use the PCB before it receives the TCPError event posted below, we set the PCB to NULL
@@ -2423,8 +2425,8 @@ CHIP_ERROR TCPEndPoint::GetSocket(IPAddressType addrType)
             return INET_ERROR_WRONG_ADDRESS_TYPE;
         mSocket = ::socket(family, SOCK_STREAM | SOCK_FLAGS, 0);
         if (mSocket == -1)
-            return chip::System::MapErrorPOSIX(errno);
-        ReturnErrorOnFailure(Layer().SystemLayer()->StartWatchingSocket(mSocket, &mWatch));
+            return CHIP_ERROR_POSIX(errno);
+        ReturnErrorOnFailure(static_cast<System::LayerSockets *>(Layer().SystemLayer())->StartWatchingSocket(mSocket, &mWatch));
         mAddrType = addrType;
 
         // If creating an IPv6 socket, tell the kernel that it will be IPv6 only.  This makes it
@@ -2496,7 +2498,7 @@ void TCPEndPoint::HandlePendingIO(System::SocketEvents events)
             // The socket option SO_ERROR is not available.
             int osConRes = 0;
 #endif
-            CHIP_ERROR conRes = chip::System::MapErrorPOSIX(osConRes);
+            CHIP_ERROR conRes = CHIP_ERROR_POSIX(osConRes);
 
             // Process the connection result.
             HandleConnectComplete(conRes);
@@ -2599,7 +2601,7 @@ void TCPEndPoint::ReceiveData()
             return;
         }
 
-        DoClose(chip::System::MapErrorPOSIX(systemErrno), false);
+        DoClose(CHIP_ERROR_POSIX(systemErrno), false);
     }
 
     else
@@ -2620,7 +2622,7 @@ void TCPEndPoint::ReceiveData()
             else
                 State = kState_Closing;
             // Do not wait for ability to read on this endpoint.
-            (void) Layer().SystemLayer()->ClearCallbackOnPendingRead(mWatch);
+            (void) static_cast<System::LayerSockets *>(Layer().SystemLayer())->ClearCallbackOnPendingRead(mWatch);
             // Call the app's OnPeerClose.
             if (OnPeerClose != nullptr)
                 OnPeerClose(this);
@@ -2678,7 +2680,7 @@ void TCPEndPoint::HandleIncomingConnection()
         }
         else
         {
-            err = chip::System::MapErrorPOSIX(errno);
+            err = CHIP_ERROR_POSIX(errno);
         }
     }
 
@@ -2718,7 +2720,7 @@ void TCPEndPoint::HandleIncomingConnection()
     {
         // Put the new end point into the Connected state.
         conEP->mSocket = conSocket;
-        err            = Layer().SystemLayer()->StartWatchingSocket(conSocket, &conEP->mWatch);
+        err            = static_cast<System::LayerSockets *>(Layer().SystemLayer())->StartWatchingSocket(conSocket, &conEP->mWatch);
         if (err == CHIP_NO_ERROR)
         {
             conEP->State = kState_Connected;
@@ -2730,10 +2732,11 @@ void TCPEndPoint::HandleIncomingConnection()
             conEP->Retain();
 
             // Wait for ability to read on this endpoint.
-            err = conEP->Layer().SystemLayer()->SetCallback(conEP->mWatch, HandlePendingIO, reinterpret_cast<intptr_t>(conEP));
+            auto conEPLayer = static_cast<System::LayerSockets *>(conEP->Layer().SystemLayer());
+            err             = conEPLayer->SetCallback(conEP->mWatch, HandlePendingIO, reinterpret_cast<intptr_t>(conEP));
             if (err == CHIP_NO_ERROR)
             {
-                err = conEP->Layer().SystemLayer()->RequestCallbackOnPendingRead(conEP->mWatch);
+                err = conEPLayer->RequestCallbackOnPendingRead(conEP->mWatch);
             }
             if (err == CHIP_NO_ERROR)
             {
@@ -2773,7 +2776,7 @@ CHIP_ERROR TCPEndPoint::CheckConnectionProgress(bool & isProgressing)
 
     if (ioctl(mSocket, TIOCOUTQ, &currPendingBytesRaw) < 0)
     {
-        return chip::System::MapErrorPOSIX(errno);
+        return CHIP_ERROR_POSIX(errno);
     }
 
     if (!CanCastTo<uint32_t>(currPendingBytesRaw))

@@ -79,11 +79,11 @@ DLL_EXPORT bool Object::TryCreate(size_t aOctets)
 }
 
 #if CHIP_SYSTEM_CONFIG_USE_LWIP
-void Object::DeferredRelease(Layer * aSystemLayer, Object::ReleaseDeferralErrorTactic aTactic)
+void Object::DeferredRelease(LayerLwIP * aSystemLayer, Object::ReleaseDeferralErrorTactic aTactic)
 {
     VerifyOrReturn(aSystemLayer != nullptr, ChipLogError(chipSystemLayer, "aSystemLayer is nullptr"));
 
-    CHIP_ERROR lError = aSystemLayer->PostEvent(*this, chip::System::kEvent_ReleaseObj, 0);
+    CHIP_ERROR lError = aSystemLayer->ScheduleLambda([this] { this->Release(); });
 
     if (lError != CHIP_NO_ERROR)
     {

@@ -112,22 +112,9 @@ void GenericSoftwareUpdateManagerImpl<ImplClass>::_SetRetryPolicyCallback(
 template <class ImplClass>
 void GenericSoftwareUpdateManagerImpl<ImplClass>::PrepareBinding(intptr_t arg)
 {
-    CHIP_ERROR err;
     GenericSoftwareUpdateManagerImpl<ImplClass> * self = &SoftwareUpdateMgrImpl();
 
     self->Cleanup();
-
-    if (!ConnectivityMgr().HaveServiceConnectivity())
-    {
-        ChipLogProgress(DeviceLayer, "Software Update Check: No service connectivity");
-        ExitNow(err = CHIP_ERROR_NOT_CONNECTED);
-    }
-
-exit:
-    if (err != CHIP_NO_ERROR)
-    {
-        self->Impl()->SoftwareUpdateFailed(err, NULL);
-    }
 }
 
 template <class ImplClass>
@@ -265,7 +252,7 @@ CHIP_ERROR GenericSoftwareUpdateManagerImpl<ImplClass>::_CheckNow(void)
         if (mState == SoftwareUpdateManager::kState_ScheduledHoldoff)
         {
             // Cancel scheduled hold off and trigger software update prepare.
-            SystemLayer.CancelTimer(HandleHoldOffTimerExpired, NULL);
+            DeviceLayer::SystemLayer().CancelTimer(HandleHoldOffTimerExpired, NULL);
         }
 
         {
@@ -633,7 +620,7 @@ void GenericSoftwareUpdateManagerImpl<ImplClass>::DriveState(SoftwareUpdateManag
             if (timeToNextQueryMS)
             {
                 mState = SoftwareUpdateManager::kState_ScheduledHoldoff;
-                SystemLayer.StartTimer(timeToNextQueryMS, HandleHoldOffTimerExpired, NULL);
+                DeviceLayer::SystemLayer().StartTimer(timeToNextQueryMS, HandleHoldOffTimerExpired, NULL);
             }
         }
     }

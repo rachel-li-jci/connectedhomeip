@@ -46,6 +46,14 @@ public:
     constexpr explicit Span(T (&databuf)[N]) : Span(databuf, N)
     {}
 
+    template <size_t N>
+    constexpr Span & operator=(T (&databuf)[N])
+    {
+        mDataBuf = databuf;
+        mDataLen = N;
+        return (*this);
+    }
+
     // Allow implicit construction from a Span over a type that matches our
     // type, up to const-ness.
     template <class U, typename = std::enable_if_t<std::is_same<std::remove_const_t<T>, std::remove_const_t<U>>::value>>
@@ -201,5 +209,16 @@ template <size_t N>
 using FixedByteSpan = FixedSpan<const uint8_t, N>;
 
 using MutableCharSpan = Span<char>;
+
+inline CHIP_ERROR CopySpanToMutableSpan(ByteSpan span_to_copy, MutableByteSpan & out_buf)
+{
+    VerifyOrReturnError(IsSpanUsable(span_to_copy), CHIP_ERROR_INVALID_ARGUMENT);
+    VerifyOrReturnError(out_buf.size() >= span_to_copy.size(), CHIP_ERROR_BUFFER_TOO_SMALL);
+
+    memcpy(out_buf.data(), span_to_copy.data(), span_to_copy.size());
+    out_buf.reduce_size(span_to_copy.size());
+
+    return CHIP_NO_ERROR;
+}
 
 } // namespace chip

@@ -20,6 +20,11 @@ function atomicType(arg)
   switch (arg.name) {
   case 'boolean':
     return 'bool';
+  case 'int64s':
+    return 'int64_t';
+  case 'int64u':
+  case 'bitmap64':
+    return 'uint64_t';
   case 'action_id':
   case 'cluster_id':
   case 'command_id':
@@ -54,6 +59,10 @@ function atomicType(arg)
     return 'chip::Percent';
   case 'percent100ths':
     return 'chip::Percent100ths';
+  case 'epoch_us':
+    return 'uint64_t';
+  case 'epoch_s':
+    return 'uint32_t';
   default:
     throw 'not overriding';
   }

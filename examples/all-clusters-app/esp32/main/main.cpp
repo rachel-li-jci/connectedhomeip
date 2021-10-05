@@ -23,6 +23,7 @@
 #include "Globals.h"
 #include "LEDWidget.h"
 #include "ListScreen.h"
+#include "OpenThreadLaunch.h"
 #include "QRCodeScreen.h"
 #include "ScreenManager.h"
 #include "WiFiWidget.h"
@@ -68,6 +69,10 @@
 
 #if CONFIG_ENABLE_PW_RPC
 #include "Rpc.h"
+#endif
+
+#if CONFIG_OPENTHREAD_ENABLED
+#include <platform/ThreadStackManager.h>
 #endif
 
 using namespace ::chip;
@@ -330,14 +335,12 @@ class SetupListModel : public ListScreen::Model
 public:
     SetupListModel()
     {
-        std::string resetWiFi                      = "Reset WiFi";
-        std::string resetToFactory                 = "Reset to factory";
-        std::string forceWifiCommissioningBasic    = "Force WiFi commissioning (basic)";
-        std::string forceWifiCommissioningEnhanced = "Force WiFi commissioning (enhanced)";
+        std::string resetWiFi                   = "Reset WiFi";
+        std::string resetToFactory              = "Reset to factory";
+        std::string forceWifiCommissioningBasic = "Force WiFi commissioning (basic)";
         options.emplace_back(resetWiFi);
         options.emplace_back(resetToFactory);
         options.emplace_back(forceWifiCommissioningBasic);
-        options.emplace_back(forceWifiCommissioningEnhanced);
     }
     virtual std::string GetTitle() { return "Setup"; }
     virtual int GetItemCount() { return options.size(); }
@@ -348,7 +351,8 @@ public:
         if (i == 0)
         {
             ConnectivityMgr().ClearWiFiStationProvision();
-            OpenBasicCommissioningWindow(ResetFabrics::kYes);
+            chip::Server::GetInstance().GetFabricTable().DeleteAllFabrics();
+            chip::Server::GetInstance().GetCommissioningWindowManager().OpenBasicCommissioningWindow();
         }
         else if (i == 1)
         {
@@ -356,13 +360,10 @@ public:
         }
         else if (i == 2)
         {
-            app::Mdns::AdvertiseCommissionableNode(app::Mdns::CommissioningMode::kEnabledBasic);
-            OpenBasicCommissioningWindow(ResetFabrics::kYes, kNoCommissioningTimeout, PairingWindowAdvertisement::kMdns);
-        }
-        else if (i == 3)
-        {
-            app::Mdns::AdvertiseCommissionableNode(app::Mdns::CommissioningMode::kEnabledEnhanced);
-            OpenBasicCommissioningWindow(ResetFabrics::kYes, kNoCommissioningTimeout, PairingWindowAdvertisement::kMdns);
+            app::MdnsServer::Instance().StartServer(Mdns::CommissioningMode::kEnabledBasic);
+            chip::Server::GetInstance().GetFabricTable().DeleteAllFabrics();
+            chip::Server::GetInstance().GetCommissioningWindowManager().OpenBasicCommissioningWindow(
+                kNoCommissioningTimeout, CommissioningWindowAdvertisement::kMdnsOnly);
         }
     }
 
@@ -615,6 +616,11 @@ extern "C" void app_main()
     chip::LaunchShell();
 #endif // CONFIG_ENABLE_CHIP_SHELL
 
+#if CONFIG_OPENTHREAD_ENABLED
+    LaunchOpenThread();
+    ThreadStackMgr().InitThreadStack();
+#endif
+
     CHIPDeviceManager & deviceMgr = CHIPDeviceManager::GetInstance();
 
     CHIP_ERROR error = deviceMgr.Init(&EchoCallbacks);
@@ -634,7 +640,7 @@ extern "C" void app_main()
 
     // Init ZCL Data Model and CHIP App Server
     AppCallbacks callbacks;
-    InitServer(&callbacks);
+    chip::Server::GetInstance().Init(&callbacks);
 
     // Initialize device attestation config
     SetDeviceAttestationCredentialsProvider(Examples::GetExampleDACProvider());

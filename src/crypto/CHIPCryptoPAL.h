@@ -27,6 +27,7 @@
 #endif
 
 #include <lib/core/CHIPError.h>
+#include <lib/core/CHIPVendorIdentifiers.hpp>
 #include <lib/support/CodeUtils.h>
 #include <lib/support/Span.h>
 
@@ -476,7 +477,9 @@ CHIP_ERROR ConvertIntegerRawToDerWithoutTag(const ByteSpan & raw_integer, Mutabl
  * @brief A function that implements AES-CCM encryption
  *
  * This implements the CHIP_Crypto_AEAD_GenerateEncrypt() cryptographic primitive
- * from the specification.
+ * from the specification. For an empty plaintext, the user of the API can provide
+ * an empty string, or a nullptr, and provide plaintext_length as 0. The output buffer,
+ * ciphertext can also be an empty string, or a nullptr for this case.
  *
  * @param plaintext Plaintext to encrypt
  * @param plaintext_length Length of plain_text
@@ -499,7 +502,9 @@ CHIP_ERROR AES_CCM_encrypt(const uint8_t * plaintext, size_t plaintext_length, c
  * @brief A function that implements AES-CCM decryption
  *
  * This implements the CHIP_Crypto_AEAD_DecryptVerify() cryptographic primitive
- * from the specification.
+ * from the specification. For an empty ciphertext, the user of the API can provide
+ * an empty string, or a nullptr, and provide ciphertext_length as 0. The output buffer,
+ * plaintext can also be an empty string, or a nullptr for this case.
  *
  * @param ciphertext Ciphertext to decrypt
  * @param ciphertext_length Length of ciphertext
@@ -771,6 +776,11 @@ public:
      * @return Returns a CHIP_ERROR on error, CHIP_NO_ERROR otherwise
      **/
     virtual CHIP_ERROR Init(const uint8_t * context, size_t context_len);
+
+    /**
+     * @brief Free Spake2+ underlying objects.
+     **/
+    virtual void Clear() = 0;
 
     /**
      * @brief Start the Spake2+ process as a verifier (i.e. an accessory being provisioned).
@@ -1094,7 +1104,7 @@ protected:
                            size_t info_len, uint8_t * out, size_t out_len) = 0;
 
     CHIP_SPAKE2P_ROLE role;
-    CHIP_SPAKE2P_STATE state;
+    CHIP_SPAKE2P_STATE state = CHIP_SPAKE2P_STATE::PREINIT;
     size_t fe_size;
     size_t hash_size;
     size_t point_size;
@@ -1119,8 +1129,9 @@ public:
         memset(&mSpake2pContext, 0, sizeof(mSpake2pContext));
     }
 
-    ~Spake2p_P256_SHA256_HKDF_HMAC() override { FreeImpl(); }
+    ~Spake2p_P256_SHA256_HKDF_HMAC() override { Spake2p_P256_SHA256_HKDF_HMAC::Clear(); }
 
+    void Clear() override;
     CHIP_ERROR Mac(const uint8_t * key, size_t key_len, const uint8_t * in, size_t in_len, uint8_t * out) override;
     CHIP_ERROR MacVerify(const uint8_t * key, size_t key_len, const uint8_t * mac, size_t mac_len, const uint8_t * in,
                          size_t in_len) override;
@@ -1146,11 +1157,6 @@ protected:
                    size_t info_length, uint8_t * out, size_t out_length) override;
 
 private:
-    /**
-     * @brief Free any underlying implementation curve, points, field elements, etc.
-     **/
-    void FreeImpl();
-
     CHIP_ERROR InitInternal();
     Hash_SHA256_stream sha256_hash_ctx;
 
@@ -1193,6 +1199,16 @@ CHIP_ERROR ValidateCertificateChain(const uint8_t * rootCertificate, size_t root
                                     size_t caCertificateLen, const uint8_t * leafCertificate, size_t leafCertificateLen);
 
 CHIP_ERROR ExtractPubkeyFromX509Cert(const ByteSpan & certificate, Crypto::P256PublicKey & pubkey);
+
+/**
+ * @brief Extracts the Authority Key Identifier from an X509 Certificate.
+ **/
+CHIP_ERROR ExtractAKIDFromX509Cert(const ByteSpan & certificate, MutableByteSpan & akid);
+
+/**
+ * @brief Extracts the Vendor ID from an X509 Certificate.
+ **/
+CHIP_ERROR ExtractVIDFromX509Cert(const ByteSpan & certificate, VendorId & vid);
 
 } // namespace Crypto
 } // namespace chip

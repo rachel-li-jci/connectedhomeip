@@ -64,13 +64,12 @@ exit:
     {
         AbortExistingExchangeContext();
     }
-    ChipLogFunctError(err);
 
     return err;
 }
 
-CHIP_ERROR CommandSender::OnMessageReceived(Messaging::ExchangeContext * apExchangeContext, const PacketHeader & aPacketHeader,
-                                            const PayloadHeader & aPayloadHeader, System::PacketBufferHandle && aPayload)
+CHIP_ERROR CommandSender::OnMessageReceived(Messaging::ExchangeContext * apExchangeContext, const PayloadHeader & aPayloadHeader,
+                                            System::PacketBufferHandle && aPayload)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -82,7 +81,6 @@ CHIP_ERROR CommandSender::OnMessageReceived(Messaging::ExchangeContext * apExcha
     SuccessOrExit(err);
 
 exit:
-    ChipLogFunctError(err);
 
     if (mpDelegate != nullptr)
     {
@@ -102,8 +100,8 @@ exit:
 
 void CommandSender::OnResponseTimeout(Messaging::ExchangeContext * apExchangeContext)
 {
-    ChipLogProgress(DataManagement, "Time out! failed to receive invoke command response from Exchange: %d",
-                    apExchangeContext->GetExchangeId());
+    ChipLogProgress(DataManagement, "Time out! failed to receive invoke command response from Exchange: " ChipLogFormatExchange,
+                    ChipLogValueExchange(apExchangeContext));
 
     if (mpDelegate != nullptr)
     {
@@ -159,7 +157,6 @@ CHIP_ERROR CommandSender::ProcessCommandDataElement(CommandDataElement::Parser &
     }
 
 exit:
-    ChipLogFunctError(err);
     if (err != CHIP_NO_ERROR && mpDelegate != nullptr)
     {
         mpDelegate->CommandResponseProtocolError(this, mCommandIndex);
