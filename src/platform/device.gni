@@ -38,7 +38,10 @@ if (chip_device_platform == "auto") {
   } else {
     chip_device_platform = "none"
   }
+  # force platform to android
+  chip_device_platform = "android"
 }
+
 
 declare_args() {
   # Enable openthread support.
@@ -74,6 +77,8 @@ declare_args() {
   } else {
     chip_mdns = "none"
   }
+  # force mdns to use platform
+  chip_mdns = "platform"
 
   # Enables full cluster-based commissioning for already-on-network devices.
   chip_use_clusters_for_ip_commissioning = false
